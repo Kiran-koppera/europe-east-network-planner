@@ -26,7 +26,9 @@ from .config import (
 from .geo import haversine_km
 
 BETA = 2.0
-STATUS_ORDER = ["No service: city not on network", "No direct service", "Transfer only",
+# "Linked via hub (untimed)" only means some city has direct trips to both ends; the top
+# opportunities are then checked against the timetable in transfers.refine().
+STATUS_ORDER = ["No service: city not on network", "No direct service", "Linked via hub (untimed)",
                 "Low frequency", "Served"]
 
 
