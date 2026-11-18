@@ -15,7 +15,7 @@ def test_times_past_midnight_parse():
 
 def test_feed_loads_and_reports_nothing_missing(feed):
     assert feed.missing == []
-    assert len(feed["stop_times"]) == 9
+    assert len(feed["stop_times"]) == 11
 
 
 def test_reference_week_is_first_full_week_after_a_settling_period(feed):

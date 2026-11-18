@@ -11,7 +11,7 @@ FIX = Path(__file__).parent / "fixtures"
 def test_pipeline_end_to_end(tmp_path):
     res = run(Paths(FIX / "mini_feed", FIX / "cities_mini.txt", tmp_path / "out", tmp_path / "hist"), "2026-01-19")
     m = res["metrics"]
-    assert m["feed"]["stop_times"] == 9
+    assert m["feed"]["stop_times"] == 11
     assert m["reference_week"]["city_pairs"] == 4
     assert m["quality"]["checks"] == 15
     site = tmp_path / "out" / "site" / "data"

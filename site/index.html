@@ -86,7 +86,7 @@
     <h2>Method and limits</h2>
     <div class="cols">
       <div><h3>Data</h3><p>Timetable: public FlixBus GTFS feed for Europe (<code>gtfs_generic_eu.zip</code>), published by Flixbus France on data.gouv.fr under the ODbL. Population: GeoNames <code>cities15000</code> (CC BY 4.0). Stops are grouped into cities when they lie within 12 km of a GeoNames city.</p></div>
-      <div><h3>Model</h3><p>Weekly departures come from the calendar of a reference week. Demand potential uses a gravity model (population × population / distance², 150–1,200 km), scaled so the strongest candidate scores 100. Its rank correlation with today's frequencies is shown in the header as a fit check.</p></div>
+      <div><h3>Model</h3><p>Weekly departures come from the calendar of a reference week. Demand potential uses a gravity model (population × population / distance², 150–1,200 km). For the top opportunities, transfers are checked against the timetable on every day of the week (15–180 min change); a transfer counts as practical if it takes at most twice the direct coach time plus one hour. The changelog compares two feeds on the same calendar week.</p></div>
       <div><h3>Limits</h3><p>No ticket or ridership data is public, so the index ranks potential and does not forecast passengers. Occupied and front-line regions of Ukraine are excluded. The dossier is a planning draft; the competent authority's checklist prevails. Not affiliated with or endorsed by Flix.</p></div>
     </div>
   </section>

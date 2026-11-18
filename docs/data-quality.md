@@ -26,6 +26,7 @@ If checks 1 or 2 fail, the content checks are skipped: they would only produce n
 
 ## First snapshot (18 Nov 2026)
 
-984,520 records checked, 0 errors, 1 warning: 68 segments faster than 120 km/h. The leading case is
-Rokovci → Sopot R on the Zagreb – Vukovar trips (7.3 km in 3 minutes, then 2.2 km in 3 minutes to
-Vinkovci). A misplaced *Sopot R* coordinate is the likely cause.
+984,520 records checked, 0 errors, 1 warning: 68 segments faster than 120 km/h on 12 stop pairs. All 68
+are in the [issue tracker](issue-tracker.md) with owners and statuses. The leading case is Rokovci → Sopot R
+on the Zagreb – Vukovar trips (7.3 km in 3 minutes, then 2.2 km in 3 minutes to Vinkovci); a misplaced
+*Sopot R* coordinate is the likely cause and stays open until verified.

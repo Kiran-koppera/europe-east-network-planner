@@ -58,8 +58,17 @@
   }
 
   // Opportunity list
-  const STATUS = ["No service: city not on network", "No direct service", "Transfer only", "Low frequency"];
-  const statusClass = (s) => "t" + STATUS.indexOf(s);
+  const STATUS = ["No service: city not on network", "No direct service", "No practical transfer",
+    "Practical transfer (one direction)", "Practical transfer", "Linked via hub (untimed)", "Low frequency"];
+  const TAG = { 0: "t0", 1: "t1", 2: "t1", 3: "t2", 4: "t2", 5: "t3", 6: "t3" };
+  const statusClass = (s) => TAG[STATUS.indexOf(s)] || "t3";
+  const hm = (m) => (m == null ? "" : `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`);
+  const transferNote = (o) => {
+    const parts = [];
+    if (o.best_ab_min != null) parts.push(`→ ${hm(o.best_ab_min)} via ${o.best_ab_hub}`);
+    if (o.best_ba_min != null) parts.push(`← ${hm(o.best_ba_min)} via ${o.best_ba_hub}`);
+    return parts.length ? ` · best change ${parts.join(", ")}` : "";
+  };
   STATUS.forEach((s) => $("#f-status").insertAdjacentHTML("beforeend", `<option>${esc(s)}</option>`));
   function renderOpps() {
     const fs = $("#f-status").value, on = $("#f-onnet").checked;
@@ -67,7 +76,7 @@
     $("#opps").innerHTML = rows.map((o) => `
       <li class="opp" tabindex="0" data-r="${o.rank}">
         <span class="r">#${o.rank}</span>
-        <span class="p">${esc(o.a_name)} – ${esc(o.b_name)}<small>${o.a_country}–${o.b_country} · ${fmt(o.km)} km · ${o.transfer_hubs} transfer hubs</small>
+        <span class="p">${esc(o.a_name)} – ${esc(o.b_name)}<small>${o.a_country}–${o.b_country} · ${fmt(o.km)} km${esc(transferNote(o))}</small>
           <span class="tag ${statusClass(o.status)}">${esc(o.status)}</span></span>
         <span class="s">${fmt(o.demand_index, 1)}<small>index</small></span>
       </li>`).join("") || `<li class="note">No pairs match these filters.</li>`;
@@ -118,22 +127,27 @@
 
   // Changelog
   const S = changes.summary;
-  $("#c-sub").textContent = changes.baseline ? `Baseline snapshot ${changes.to}. The weekly run compares each new feed with the previous snapshot.` : `${changes.from} → ${changes.to}`;
+  const LABEL = { place_added: "City added", place_removed: "City removed", stop_added: "Stop added", stop_removed: "Stop removed",
+    pair_added: "Direct pair added", pair_removed: "Direct pair removed", frequency_up: "Frequency up", frequency_down: "Frequency down" };
+  $("#c-sub").textContent = changes.baseline ? `Baseline snapshot ${changes.to}. Changes appear from the next weekly run.`
+    : changes.comparable ? `Snapshots ${changes.from} → ${changes.to}, both measured on the week of ${changes.week}.`
+    : (changes.note || "Snapshots do not cover a common week.");
   $("#changelog").innerHTML = `<div class="chg">
-    <div><b>${S.places_added}/${S.places_removed}</b><span>cities added / removed</span></div>
+    <div><b>${S.stops_added ?? 0}/${S.stops_removed ?? 0}</b><span>stops added / removed</span></div>
     <div><b>${S.pairs_added}/${S.pairs_removed}</b><span>direct pairs added / removed</span></div>
     <div><b>${S.frequency_up}/${S.frequency_down}</b><span>frequency up / down (≥7/wk)</span></div></div>` +
-    (changes.events.length ? `<div class="table-wrap short"><table><tbody>${changes.events.filter((e) => e.ee !== false).slice(0, 40).map((e) =>
-      `<tr><td>${esc(e.type.replace("_", " "))}</td><td>${esc(e.item)}</td><td class="n">${e.from != null ? `${e.from} → ${e.to}` : e.weekly ?? ""}</td></tr>`).join("")}</tbody></table></div>` : "");
+    (changes.events.length ? `<div class="table-wrap short" style="margin-top:10px"><table><thead><tr><th>Change</th><th>Item</th><th class="n">Weekly</th></tr></thead><tbody>${changes.events.slice(0, 60).map((e) =>
+      `<tr><td>${esc(LABEL[e.type] || e.type)}</td><td>${esc(e.item)}</td><td class="n">${e.from != null && e.to != null ? `${e.from} → ${e.to}` : e.to ?? e.from ?? ""}</td></tr>`).join("")}</tbody></table></div>` : "");
   $("#tbl-top").innerHTML = `<thead><tr><th>City pair</th><th class="n">km</th><th class="n">Weekly</th><th class="n">Fastest</th></tr></thead><tbody>` +
     top.slice(0, 15).map((t) => `<tr><td>${esc(t.a_name)} – ${esc(t.b_name)}</td><td class="n">${fmt(t.km)}</td><td class="n">${fmt(t.weekly_departures)}</td><td class="n">${Math.floor(t.fastest_min / 60)}h${String(t.fastest_min % 60).padStart(2, "0")}</td></tr>`).join("") + "</tbody>";
 
   // Downloads
   const dl = [
     ["XLSX", "europe-east-network-report.xlsx", "Network report pack", "Summary, data quality, country KPIs, city pairs, opportunities, changelog"],
+    ["XLSX", "data-quality-issue-tracker.xlsx", "Data-quality issue tracker", "Speed exceptions by stop pair: lookups, formula flags, owner and status dropdowns, summary"],
   ];
   if (meta.dossier) {
-    dl.push(["DOCX", meta.dossier.file, `Line dossier: ${meta.dossier.pair}`, "Draft authorization dossier: route, stops, map, timetable, legal basis, checklist"]);
+    dl.push(["DOCX", meta.dossier.file, `Worked case: ${meta.dossier.pair}`, "Today's timed options, real stops, timetables both ways, vehicles, legal basis, handoff"]);
     dl.push(["PNG", meta.dossier.file.replace(".docx", "-map.png"), "Dossier overview map", "Schematic map of the proposed line"]);
   }
   $("#dl").innerHTML = dl.map(([x, f, t, d]) => `<a class="dl" href="data/${f}" download><span class="ext">${x}</span><span><b>${esc(t)}</b><span>${esc(d)}</span></span></a>`).join("");
