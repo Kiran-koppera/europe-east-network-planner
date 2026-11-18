@@ -101,3 +101,43 @@ def country_kpis(places: pd.DataFrame, pairs: pd.DataFrame, legs: pd.DataFrame, 
             "cross_border_share": round(float(pp["cross_border"].mean()) if len(pp) else 0.0, 3),
         })
     return pd.DataFrame(rows).sort_values("weekly_trip_departures", ascending=False).reset_index(drop=True)
+
+
+def weekly_series(feed: Feed, stop_places: pd.DataFrame, first_monday: date, n_weeks: int = 8):
+    """Weekly departures for n consecutive calendar weeks, per place and per Europe East city pair.
+
+    Lets two feed snapshots be compared on the same calendar week, so a seasonal difference
+    between two analysis weeks is never mistaken for a network change.
+    """
+    from datetime import timedelta
+
+    weeks = [first_monday + timedelta(weeks=i) for i in range(n_weeks)]
+    per_week = {w: trip_weekly_runs(feed, w, w + timedelta(days=6)) for w in weeks}
+    union = pd.Series(1, index=sorted(set().union(*[set(r.index) for r in per_week.values()])))
+    legs = od_legs(feed, stop_places, union)
+    country = stop_places.drop_duplicates("place_id").set_index("place_id")["country"]
+    ee_place = country.isin(EUROPE_EAST)
+    lo = np.where(legs["o"] < legs["d"], legs["o"], legs["d"])
+    hi = np.where(legs["o"] < legs["d"], legs["d"], legs["o"])
+    legs = legs.assign(key=pd.Series(lo, index=legs.index) + "|" + pd.Series(hi, index=legs.index),
+                       ee=legs["o"].map(ee_place).fillna(False) | legs["d"].map(ee_place).fillna(False))
+    starts = legs.drop_duplicates(["trip_id", "o"])
+    pair_cols, place_cols = {}, {}
+    for w, runs in per_week.items():
+        r = legs["trip_id"].map(runs).fillna(0)
+        pair_cols[w] = r[legs["ee"]].groupby(legs.loc[legs["ee"], "key"]).sum()
+        place_cols[w] = starts["trip_id"].map(runs).fillna(0).groupby(starts["o"]).sum()
+    pairs = pd.DataFrame(pair_cols).fillna(0).astype(int)
+    places = pd.DataFrame(place_cols).fillna(0).astype(int)
+    st = feed["stop_times"][["trip_id", "stop_id"]].drop_duplicates()
+    st = st[st["stop_id"].isin(stop_places.loc[stop_places["country"].isin(EUROPE_EAST), "stop_id"])]
+    stops = pd.DataFrame({w: st["trip_id"].map(r).fillna(0).groupby(st["stop_id"]).sum()
+                          for w, r in per_week.items()}).fillna(0).astype(int)
+    return [w.isoformat() for w in weeks], places, pairs, stops
+
+
+def stop_weekly_calls(feed: Feed, runs: pd.Series) -> pd.Series:
+    """Trips calling at each stop in the reference week."""
+    st = feed["stop_times"][["trip_id", "stop_id"]].drop_duplicates()
+    st = st[st["trip_id"].isin(runs.index)]
+    return st["trip_id"].map(runs).groupby(st["stop_id"]).sum()

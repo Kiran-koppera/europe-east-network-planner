@@ -11,13 +11,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import changelog, demand, network, quality
+from . import changelog, demand, network, quality, transfers
 from .calendar import reference_week
 from .config import EUROPE_EAST, TZ_TO_COUNTRY
 from .dossier import EU_MEMBERS, write_dossier
 from .excel import write_excel
 from .geo import assign_places, load_cities
 from .gtfs import load_feed
+from .tracker import write_tracker
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -47,7 +48,7 @@ def segments(feed, stop_places: pd.DataFrame, runs: pd.Series, places: pd.DataFr
 
 
 def pick_dossier_pair(opps: pd.DataFrame) -> dict | None:
-    on_net = opps[opps["status"].isin(["No direct service", "Transfer only", "Low frequency"])]
+    on_net = opps[~opps["status"].isin(["No service: city not on network", "Low frequency"])]
     eu_xb = on_net[on_net["cross_border"] & on_net["a_country"].isin(EU_MEMBERS) & on_net["b_country"].isin(EU_MEMBERS)]
     pick = eu_xb if len(eu_xb) else on_net
     return pick.iloc[0].to_dict() if len(pick) else None
@@ -74,18 +75,22 @@ def run(paths: Paths, snapshot_date: str | None = None) -> dict:
     classified = demand.classify(cands, pairs, places)
     calib = demand.calibrate(classified)
     opps = demand.opportunities(classified, top=50)
+    opps = transfers.refine(opps, feed, stop_places, pairs, places, week)
     unserved = demand.unserved_cities(cities, places)
 
     meta = {**feed.feed_info, "sha256": feed.sha256, "snapshot_date": snapshot_date,
             "reference_week": [week[0].isoformat(), week[1].isoformat()]}
-    snap = changelog.snapshot(meta, places, pairs)
+    weeks, place_weekly, pair_weekly, stop_weekly = network.weekly_series(feed, stop_places, week[0], n_weeks=8)
+    snap = changelog.snapshot(meta, weeks, places, place_weekly, pair_weekly, stop_weekly, stop_places)
     prev = changelog.previous_snapshot(paths.history, snapshot_date)
     changes = changelog.diff(prev, snap)
     changelog.save_snapshot(snap, paths.history)
 
     reports = paths.out / "reports"
     pick = pick_dossier_pair(opps)
-    dossier_path = write_dossier(pick, places, meta, reports) if pick else None
+    stop_weekly = network.stop_weekly_calls(feed, runs)
+    dossier_path, case = (write_dossier(pick, places, meta, reports, feed=feed, stop_places=stop_places, week=week,
+                                        legs=legs, pairs=pairs, stop_weekly=stop_weekly) if pick else (None, None))
 
     ee_places = places[places["europe_east"]]
     ee_pairs = pairs[pairs["europe_east"]]
@@ -124,6 +129,10 @@ def run(paths: Paths, snapshot_date: str | None = None) -> dict:
             [{"note": "Baseline snapshot: changes appear from the next weekly run."}]),
     })
 
+    tracker_stats = write_tracker(reports / "data-quality-issue-tracker.xlsx", quality.speed_exceptions(feed),
+                                  feed["stops"], meta)
+    metrics["quality"]["tracker"] = tracker_stats
+
     # Site
     site = paths.out / "site"
     if site.exists():
@@ -156,6 +165,7 @@ def run(paths: Paths, snapshot_date: str | None = None) -> dict:
         shutil.copy(dossier_path, data / dossier_path.name)
         shutil.copy(dossier_path.with_name(dossier_path.stem + "-map.png"), data / (dossier_path.stem + "-map.png"))
     shutil.copy(reports / "europe-east-network-report.xlsx", data / "europe-east-network-report.xlsx")
+    shutil.copy(reports / "data-quality-issue-tracker.xlsx", data / "data-quality-issue-tracker.xlsx")
     return meta_out
 
 

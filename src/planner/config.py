@@ -28,6 +28,8 @@ TZ_TO_COUNTRY = {
 
 # A stop belongs to a GeoNames city (population >= 15,000) if it lies within this radius.
 CITY_RADIUS_KM = 12.0
+# Same-named stops outside any city within this distance are one town (stable across feed versions).
+TOWN_MERGE_KM = 5.0
 
 # Demand-gap model.
 GRAVITY_MIN_POP = 100_000          # both cities in a candidate pair
@@ -38,9 +40,10 @@ MERGE_RADIUS_KM = 15               # GeoNames lists some city districts separate
 # Destinations outside this feed's market (Turkey has its own Flix feed).
 EXCLUDED_COUNTRIES = {"TR"}
 # Regions where scheduled commercial coach service is not operable (occupation or front line).
-# GeoNames admin1 codes. Review whenever the situation changes.
+# GeoNames admin1 codes. Review whenever the situation changes. Kharkiv (07) is not excluded:
+# the 15 Nov 2026 feed serves it from three stops.
 EXCLUDED_REGIONS = {
-    "UA": {"05": "Donetsk", "07": "Kharkiv", "08": "Kherson", "11": "Crimea", "14": "Luhansk",
+    "UA": {"05": "Donetsk", "08": "Kherson", "11": "Crimea", "14": "Luhansk",
            "20": "Sevastopol", "21": "Sumy", "26": "Zaporizhzhia"},
 }
 

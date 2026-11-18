@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .config import CITY_RADIUS_KM, TZ_TO_COUNTRY
+from .config import CITY_RADIUS_KM, TOWN_MERGE_KM, TZ_TO_COUNTRY
 
 EARTH_KM = 6371.0088
 GEONAMES_COLS = ["geonameid", "name", "asciiname", "alternatenames", "lat", "lon", "fclass", "fcode",
@@ -60,11 +60,13 @@ def assign_places(stops: pd.DataFrame, cities: pd.DataFrame,
     s["place_id"], s["place"], s["place_pop"], s["place_lat"], s["place_lon"] = "", "", 0, np.nan, np.nan
 
     clat, clon, cpop = cities["lat"].to_numpy(), cities["lon"].to_numpy(), cities["population"].to_numpy()
+    ccountry = cities["country"].to_numpy()
     for i, row in s.iterrows():
         if np.isnan(row.stop_lat):
             continue
         d = haversine_km(row.stop_lat, row.stop_lon, clat, clon)
-        near = np.where(d <= radius_km)[0]
+        same_country = (ccountry == row.country) if row.country else np.ones(len(ccountry), bool)
+        near = np.where((d <= radius_km) & same_country)[0]  # never join a city across a border
         if len(near):
             j = near[np.argmax(cpop[near])]
             c = cities.iloc[j]
@@ -73,7 +75,33 @@ def assign_places(stops: pd.DataFrame, cities: pd.DataFrame,
             if not s.at[i, "country"]:
                 s.at[i, "country"] = c.country
         else:
-            s.loc[i, ["place_id", "place", "place_lat", "place_lon"]] = (
-                f"stop:{row.stop_id}", short_name(row.stop_name), row.stop_lat, row.stop_lon)
+            s.loc[i, ["place", "place_lat", "place_lon"]] = (short_name(row.stop_name), row.stop_lat, row.stop_lon)
+    _group_small_towns(s)
     s["place_pop"] = s["place_pop"].astype("int64")
     return s
+
+
+def _group_small_towns(s: pd.DataFrame, merge_km: float = TOWN_MERGE_KM) -> None:
+    """Stops outside any GeoNames city become a town place keyed by country and town name.
+
+    Same-named stops within merge_km share one place, so a stop that is moved or re-keyed
+    (e.g. a new stop ID 400 m away) stays the same place across feed versions. The key does not
+    depend on stop IDs, which keeps it stable between snapshots.
+    """
+    towns: dict[str, list[tuple[float, float, str]]] = {}
+    for i in s.index[s["place_id"] == ""]:
+        if np.isnan(s.at[i, "stop_lat"]):
+            continue
+        base = f"town:{s.at[i, 'country']}:{s.at[i, 'place'].lower()}"
+        lat, lon = s.at[i, "stop_lat"], s.at[i, "stop_lon"]
+        pid = None
+        for clat, clon, cid in towns.get(base, []):
+            if haversine_km(lat, lon, clat, clon) <= merge_km:
+                pid = cid
+                s.loc[i, ["place_lat", "place_lon"]] = (clat, clon)
+                break
+        if pid is None:
+            n = len(towns.get(base, []))
+            pid = base if n == 0 else f"{base}#{n + 1}"
+            towns.setdefault(base, []).append((lat, lon, pid))
+        s.at[i, "place_id"] = pid
