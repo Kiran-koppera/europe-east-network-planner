@@ -1,0 +1,7 @@
+stop_id,stop_name,stop_lat,stop_lon,stop_timezone
+WAW1,Warsaw (West),52.2297,21.0122,Europe/Warsaw
+WAW2,Warsaw (Airport),52.1657,20.9671,Europe/Warsaw
+KRK,Krakow (Bus Station),50.0647,19.9450,Europe/Warsaw
+PRG,Prague (Florenc),50.0755,14.4378,Europe/Prague
+VIE,Vienna (Erdberg),48.2082,16.3738,Europe/Vienna
+ORPH,Nowhere stop,51.0,18.0,Europe/Warsaw

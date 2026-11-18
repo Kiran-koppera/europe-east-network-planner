@@ -1,0 +1,4 @@
+agency_id,route_id,route_short_name,route_long_name,route_type
+A,R1,1,Warsaw - Krakow - Vienna,3
+A,R2,2,Krakow - Prague,3
+A,R3,3,Unused route,3
