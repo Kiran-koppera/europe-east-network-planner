@@ -100,16 +100,7 @@ def run_checks(feed: Feed) -> list[Check]:
     add(Check("time_order", "Times never go backwards within a trip", ERROR, len(n), len(bad_time),
               _ex(sorted(bad_time))))
 
-    seg = s.assign(prev_stop=s["stop_id"].shift(), prev_dep=prev_dep)[same]
-    seg = seg.merge(stops[["stop_id", "stop_lat", "stop_lon"]], on="stop_id")
-    seg = seg.merge(stops[["stop_id", "stop_lat", "stop_lon"]].rename(
-        columns={"stop_id": "prev_stop", "stop_lat": "plat", "stop_lon": "plon"}), on="prev_stop")
-    seg["km"] = haversine_km(seg["plat"], seg["plon"], seg["stop_lat"], seg["stop_lon"])
-    seg["h"] = (seg["arr_s"] - seg["prev_dep"]) / 3600
-    seg = seg.merge(trips[["trip_id", "route_id"]], on="trip_id").merge(routes[["route_id", "route_type"]], on="route_id")
-    limit = np.where(seg["route_type"] == 2, MAX_TRAIN_SPEED_KMH, MAX_BUS_SPEED_KMH)
-    # Ignore very short hops: minute-rounded times make their speeds meaningless.
-    fast = seg[(seg["km"] > 3) & ((seg["h"] <= 0) | (seg["km"] / seg["h"].where(seg["h"] > 0) > limit))]
+    seg, fast = _speed_segments(s, stops, trips, routes)
     # Report the stop pairs involved: a recurring pair usually means a misplaced stop coordinate.
     names = stops.set_index("stop_id")["stop_name"]
     pairs = (fast["prev_stop"].map(names) + " -> " + fast["stop_id"].map(names)).value_counts()
@@ -135,6 +126,34 @@ def run_checks(feed: Feed) -> list[Check]:
         expired = int(parse_date(fi["feed_end_date"]) < parse_date(fi.get("feed_start_date", fi["feed_end_date"])))
     add(Check("feed_dates", "Feed validity period is consistent", ERROR, 1, expired))
     return out
+
+
+def _speed_segments(s: pd.DataFrame, stops: pd.DataFrame, trips: pd.DataFrame, routes: pd.DataFrame):
+    """Consecutive-stop segments with straight-line km, scheduled hours and the speed limit for the mode."""
+    same = s["trip_id"].eq(s["trip_id"].shift())
+    seg = s.assign(prev_stop=s["stop_id"].shift(), prev_dep=s["dep_s"].shift(),
+                   prev_dep_time=s["departure_time"].shift())[same]
+    seg = seg.merge(stops[["stop_id", "stop_lat", "stop_lon"]], on="stop_id")
+    seg = seg.merge(stops[["stop_id", "stop_lat", "stop_lon"]].rename(
+        columns={"stop_id": "prev_stop", "stop_lat": "plat", "stop_lon": "plon"}), on="prev_stop")
+    seg["km"] = haversine_km(seg["plat"], seg["plon"], seg["stop_lat"], seg["stop_lon"])
+    seg["h"] = (seg["arr_s"] - seg["prev_dep"]) / 3600
+    seg = seg.merge(trips[["trip_id", "route_id"]], on="trip_id").merge(routes[["route_id", "route_type"]], on="route_id")
+    seg["limit"] = np.where(seg["route_type"] == 2, MAX_TRAIN_SPEED_KMH, MAX_BUS_SPEED_KMH)
+    # Ignore very short hops: minute-rounded times make their speeds meaningless.
+    fast = seg[(seg["km"] > 3) & ((seg["h"] <= 0) | (seg["km"] / seg["h"].where(seg["h"] > 0) > seg["limit"]))]
+    return seg, fast
+
+
+def speed_exceptions(feed: Feed) -> pd.DataFrame:
+    """Every implausible-speed segment with trip, route, stop IDs and scheduled times (for the issue tracker)."""
+    s = feed["stop_times"].sort_values(["trip_id", "stop_sequence"])
+    _, fast = _speed_segments(s, feed["stops"], feed["trips"], feed["routes"])
+    out = fast.rename(columns={"prev_stop": "from_stop_id", "stop_id": "to_stop_id",
+                               "prev_dep_time": "scheduled_departure", "arrival_time": "scheduled_arrival"})
+    out = out[["trip_id", "route_id", "route_type", "from_stop_id", "to_stop_id", "scheduled_departure",
+               "scheduled_arrival", "km", "h", "limit"]]
+    return out.sort_values(["from_stop_id", "to_stop_id", "trip_id"]).reset_index(drop=True)
 
 
 def scorecard(checks: list[Check]) -> dict:
