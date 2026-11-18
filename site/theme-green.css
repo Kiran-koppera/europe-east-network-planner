@@ -1,0 +1,78 @@
+/* Green mobility theme. Layered on style.css: redefines the tokens and swaps glass panels for crisp
+   white cards on a pale mint field. Fresh green (#16a34a family) is the accent; type is deep charcoal.
+   A thin "route line" motif (dashed green stroke with stop dots) marks the hero and card headers. */
+:root {
+  --bg: #f1f6f3;
+  --bloom-1: rgba(22, 163, 74, .10); --bloom-2: rgba(255, 255, 255, .9); --bloom-3: rgba(14, 116, 144, .07);
+  --glass: #ffffff; --glass-strong: #ffffff;
+  --edge: #dfe9e3; --hair: #e3ece6;
+  --shadow: 0 1px 2px rgba(16, 40, 28, .05), 0 6px 18px rgba(16, 40, 28, .06);
+  --surface: #ffffff; --ink: #17201b; --ink-2: #4b5a52; --muted: #7d8b83; --line: #e8efea;
+  --brand: #15803d; --brand-2: #16a34a; --accent: #ea580c;
+  --l1: #b7e1c6; --l2: #3fae6a; --l3: #166534; --uns: #c2410c;
+  --good: #15803d; --warn: #b45309; --bad: #b91c1c;
+  --map-filter: grayscale(1) brightness(1.06) contrast(.88);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1512;
+  --bloom-1: rgba(34, 197, 94, .10); --bloom-2: rgba(15, 21, 18, 1); --bloom-3: rgba(14, 116, 144, .08);
+  --glass: #161e1a; --glass-strong: #1b241f;
+  --edge: #24302a; --hair: #26322c;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 22px rgba(0, 0, 0, .3);
+  --surface: #161e1a; --ink: #e9f1ec; --ink-2: #b4c2ba; --muted: #84948b; --line: #222c27;
+  --brand: #4ade80; --brand-2: #86efac; --accent: #fb923c;
+  --l1: #2f5b40; --l2: #4fbf7a; --l3: #a7f0c2; --uns: #fdba74;
+  --good: #4ade80; --warn: #fbbf24; --bad: #f87171;
+  --map-filter: grayscale(1) invert(1) brightness(.72) contrast(.92);
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f1512;
+  --bloom-1: rgba(34, 197, 94, .10); --bloom-2: rgba(15, 21, 18, 1); --bloom-3: rgba(14, 116, 144, .08);
+  --glass: #161e1a; --glass-strong: #1b241f;
+  --edge: #24302a; --hair: #26322c;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 22px rgba(0, 0, 0, .3);
+  --surface: #161e1a; --ink: #e9f1ec; --ink-2: #b4c2ba; --muted: #84948b; --line: #222c27;
+  --brand: #4ade80; --brand-2: #86efac; --accent: #fb923c;
+  --l1: #2f5b40; --l2: #4fbf7a; --l3: #a7f0c2; --uns: #fdba74;
+  --good: #4ade80; --warn: #fbbf24; --bad: #f87171;
+  --map-filter: grayscale(1) invert(1) brightness(.72) contrast(.92);
+  color-scheme: dark; }
+
+/* crisp cards instead of frosted glass */
+.card, .kpi { -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: var(--shadow); border-radius: 14px; }
+.lights { display: none; }
+
+/* menu bar: solid, with a green route stripe */
+.menubar { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none;
+  border-bottom: 0; box-shadow: 0 1px 0 var(--hair), 0 3px 0 -1px var(--brand-2); }
+.mark { background: var(--brand-2); border-radius: 50%; box-shadow: none; }
+.mark::after { inset: 4px; border: 2px solid #fff; border-radius: 50%; }
+.links a:hover { background: color-mix(in srgb, var(--brand-2) 10%, transparent); color: var(--brand); }
+.gh { background: var(--brand); color: #fff; border-color: var(--brand); }
+:root:not([data-theme="light"]) .gh { color: #fff; }
+
+/* hero with a route-line motif */
+.hero { position: relative; padding-block: 44px 18px; }
+.hero::after { content: ""; display: block; height: 10px; margin-top: 22px; max-width: 520px;
+  background:
+    radial-gradient(circle, var(--brand-2) 4px, transparent 4.5px) 0 50% / 130px 10px repeat-x,
+    linear-gradient(90deg, var(--brand-2) 0 100%) 0 50% / 100% 2px no-repeat; opacity: .85; }
+.eyebrow { color: var(--brand); }
+.snap { background: color-mix(in srgb, var(--brand-2) 8%, var(--surface)); border-color: color-mix(in srgb, var(--brand-2) 25%, transparent);
+  box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+
+/* KPI tiles: green top rule */
+.kpi { border-top: 3px solid var(--brand-2); }
+.kpi .v { color: var(--ink); }
+
+/* card headers carry a small stop marker */
+.card-head h2::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  border: 2.5px solid var(--brand-2); margin-right: 9px; vertical-align: 1px; }
+
+.toggles label, .chg div, .dl { background: var(--surface); }
+.opp.on { background: color-mix(in srgb, var(--brand-2) 8%, var(--surface)); box-shadow: inset 3px 0 0 var(--brand-2); }
+.dl .ext { background: var(--brand); }
+.bar { background: linear-gradient(90deg, var(--l1), var(--brand-2)); }
+th { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.leaflet-bar, .leaflet-control-attribution { background: var(--surface) !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.leaflet-popup-content-wrapper, .leaflet-tooltip { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
