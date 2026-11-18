@@ -27,8 +27,8 @@ def snapshot(feed_meta: dict, places: pd.DataFrame, pairs: pd.DataFrame) -> dict
 def save_snapshot(snap: dict, history_dir: Path) -> Path:
     history_dir.mkdir(parents=True, exist_ok=True)
     path = history_dir / f"{snap['meta']['snapshot_date']}.json.gz"
-    with gzip.open(path, "wt", encoding="utf-8") as f:
-        json.dump(snap, f, separators=(",", ":"), ensure_ascii=False)
+    raw = json.dumps(snap, separators=(",", ":"), ensure_ascii=False, sort_keys=True).encode("utf-8")
+    path.write_bytes(gzip.compress(raw, mtime=0))  # mtime=0: identical data gives identical bytes
     return path
 
 

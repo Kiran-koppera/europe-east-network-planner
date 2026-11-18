@@ -9,7 +9,7 @@ line-authorization dossiers. Rebuilt and redeployed automatically every week.**
 [![CI](https://github.com/Kiran-koppera/europe-east-network-planner/actions/workflows/ci.yml/badge.svg)](https://github.com/Kiran-koppera/europe-east-network-planner/actions/workflows/ci.yml)
 [![Weekly refresh](https://github.com/Kiran-koppera/europe-east-network-planner/actions/workflows/refresh.yml/badge.svg)](https://github.com/Kiran-koppera/europe-east-network-planner/actions/workflows/refresh.yml)
 ![Coverage 92%](https://img.shields.io/badge/coverage-92%25-0b4f8a)
-![Python 3.9 | 3.12](https://img.shields.io/badge/python-3.9%20%7C%203.12-0b4f8a)
+![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-0b4f8a)
 ![License MIT, data ODbL](https://img.shields.io/badge/license-MIT%20%2F%20ODbL-555)
 
 ### [▶ Live dashboard](https://kiran-koppera.github.io/europe-east-network-planner/) · [Excel report](https://kiran-koppera.github.io/europe-east-network-planner/data/europe-east-network-report.xlsx) · [Example line dossier](https://kiran-koppera.github.io/europe-east-network-planner/data/dossier-bucharest-plovdiv.docx) · [Method](docs/method.md)
@@ -75,14 +75,14 @@ All figures are produced by the pipeline from the feed valid 15 Nov 2026 – 15 
    geo     ─────┤  stop → city (largest city within 12 km)
    network ─────┤  reference-week runs → place-to-place legs → city pairs, country KPIs
    demand  ─────┤  gravity index → status: not on network / no direct / transfer only / low frequency
-   changelog ───┤  compare with last week's gzipped snapshot in data/history/
+   changelog ───┤  compare with last week's gzipped snapshot (data-history branch)
    reports ─────┤  Excel pack · Word dossier · overview map
    site    ─────┘  static JSON + Leaflet dashboard → GitHub Pages
 ```
 
 A GitHub Actions workflow runs this every Monday at 05:00 UTC, fails the build if any data-quality
-**error** appears, commits the new snapshot and redeploys the site. CI runs lint and tests on Python 3.9
-and 3.12 for every push.
+**error** appears, stores the new snapshot on the `data-history` branch and redeploys the site. CI runs lint and tests on Python 3.10
+and 3.13 for every push (3.9 is supported and tested locally).
 
 Details: [method](docs/method.md) · [data-quality checks](docs/data-quality.md) · [line dossier](docs/line-dossier.md).
 
@@ -117,7 +117,7 @@ Every assumption (country scope, distance band, speed limits, exclusions, timeta
 │   └── pipeline.py     end-to-end run
 ├── site/               dashboard (HTML, CSS, vanilla JS + Leaflet)
 ├── tests/              unit + end-to-end tests on a hand-built mini feed
-├── data/history/       weekly network snapshots (ODbL)
+├── data/history/       baseline snapshot; weekly snapshots live on the data-history branch (ODbL)
 ├── docs/               method, checks, dossier, images
 └── .github/workflows/  ci.yml, refresh.yml
 ```
