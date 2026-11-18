@@ -1,0 +1,140 @@
+/* Europe East Coach Network Planner: renders the JSON written by `python -m planner run`. */
+(async function () {
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const fmt = (n, d = 0) => (n == null ? "–" : Number(n).toLocaleString("en-GB", { maximumFractionDigits: d, minimumFractionDigits: d }));
+  const pct = (x, d = 0) => (x == null ? "–" : (x * 100).toFixed(d) + "%");
+  const get = (f) => fetch("data/" + f).then((r) => r.json());
+  const [meta, net, opps, uns, countries, quality, changes, top] = await Promise.all(
+    ["meta.json", "network.json", "opportunities.json", "unserved.json", "countries.json", "quality.json", "changelog.json", "top_pairs.json"].map(get));
+  const M = meta.metrics, F = meta.meta;
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const ymd = (s) => (s && s.length === 8 ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6)}` : s);
+
+  $("#snap").textContent = `Snapshot ${F.snapshot_date} · feed valid ${ymd(F.feed_start_date)} to ${ymd(F.feed_end_date)} · reference week ${F.reference_week[0]} to ${F.reference_week[1]}.`;
+
+  // KPIs
+  const E = M.europe_east, Q = M.quality, D = M.demand;
+  const kpis = [
+    ["Countries served", E.countries_served, `of 15 in Europe East`],
+    ["Cities on network", fmt(E.places), `${E.cities_100k_served} with ≥100k people`],
+    ["Weekly departures", fmt(E.weekly_trip_departures), "trips starting in Europe East"],
+    ["Direct city pairs", fmt(E.city_pairs), `${pct(E.cross_border_share)} cross-border`],
+    ["Data quality", Q.pass_rate.toFixed(2) + "%", `${fmt(Q.records_checked)} records, ${Q.checks} checks`],
+    ["Demand model fit", "ρ = " + (D.spearman ?? "–"), `rank correlation on ${fmt(D.served_pairs)} served pairs`],
+  ];
+  $("#kpis").innerHTML = kpis.map(([l, v, n]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join("");
+
+  // Map
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches && document.documentElement.dataset.theme !== "light";
+  const map = L.map("leaflet", { preferCanvas: true, zoomSnap: 0.5 }).setView([48.6, 22.5], 5);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 12, className: dark ? "tiles dark" : "tiles",
+  }).addTo(map);
+  const P = Object.fromEntries(net.places.map((p) => [p.id, p]));
+  const netLayer = L.layerGroup(), oppLayer = L.layerGroup(), unsLayer = L.layerGroup(), hiLayer = L.layerGroup().addTo(map);
+  const segs = net.segments.slice().sort((a, b) => a[2] - b[2]);
+  for (const [a, b, w] of segs) {
+    const pa = P[a], pb = P[b];
+    if (!pa || !pb) continue;
+    const cls = w >= 70 ? ["--l3", 3.2] : w >= 14 ? ["--l2", 2] : ["--l1", 1.2];
+    L.polyline([[pa.y, pa.x], [pb.y, pb.x]], { color: css(cls[0]), weight: cls[1], opacity: 0.9 })
+      .bindTooltip(`${esc(pa.n)} – ${esc(pb.n)}: <b>${w}</b> runs/week`, { sticky: true }).addTo(netLayer);
+  }
+  for (const p of net.places.filter((p) => p.ee)) {
+    L.circleMarker([p.y, p.x], { radius: p.w > 300 ? 5 : p.w > 60 ? 3.5 : 2.2, color: css("--brand"), weight: 1, fillColor: css("--surface"), fillOpacity: 1 })
+      .bindPopup(`<b>${esc(p.n)}</b> (${p.c})<br>${fmt(p.w)} weekly departures<br>${p.d} direct destinations${p.p ? `<br>Population ${fmt(p.p)}` : ""}`).addTo(netLayer);
+  }
+  const oppLine = (o, style) => L.polyline([[o.a_lat, o.a_lon], [o.b_lat, o.b_lon]], style);
+  opps.slice(0, 20).forEach((o) => oppLine(o, { color: css("--accent"), weight: 2, dashArray: "6 6", opacity: 0.85 })
+    .bindTooltip(`#${o.rank} ${esc(o.a_name)} – ${esc(o.b_name)} · index ${o.demand_index}`, { sticky: true }).addTo(oppLayer));
+  uns.forEach((c) => L.circleMarker([c.lat, c.lon], { radius: 5, color: css("--uns"), weight: 2, fill: false })
+    .bindTooltip(`${esc(c.name)} (${c.country}) · ${fmt(c.population)} people · no stop within 12 km`).addTo(unsLayer));
+  const layers = { "#t-net": netLayer, "#t-opp": oppLayer, "#t-uns": unsLayer };
+  for (const [id, layer] of Object.entries(layers)) {
+    layer.addTo(map);
+    $(id).addEventListener("change", (e) => (e.target.checked ? layer.addTo(map) : map.removeLayer(layer)));
+  }
+
+  // Opportunity list
+  const STATUS = ["No service: city not on network", "No direct service", "Transfer only", "Low frequency"];
+  const statusClass = (s) => "t" + STATUS.indexOf(s);
+  STATUS.forEach((s) => $("#f-status").insertAdjacentHTML("beforeend", `<option>${esc(s)}</option>`));
+  function renderOpps() {
+    const fs = $("#f-status").value, on = $("#f-onnet").checked;
+    const rows = opps.filter((o) => (!fs || o.status === fs) && (!on || o.status !== STATUS[0]));
+    $("#opps").innerHTML = rows.map((o) => `
+      <li class="opp" tabindex="0" data-r="${o.rank}">
+        <span class="r">#${o.rank}</span>
+        <span class="p">${esc(o.a_name)} – ${esc(o.b_name)}<small>${o.a_country}–${o.b_country} · ${fmt(o.km)} km · ${o.transfer_hubs} transfer hubs</small>
+          <span class="tag ${statusClass(o.status)}">${esc(o.status)}</span></span>
+        <span class="s">${fmt(o.demand_index, 1)}<small>index</small></span>
+      </li>`).join("") || `<li class="note">No pairs match these filters.</li>`;
+    $("#opps").querySelectorAll(".opp").forEach((li) => {
+      const show = () => {
+        const o = opps.find((x) => x.rank === +li.dataset.r);
+        $("#opps").querySelectorAll(".opp").forEach((x) => x.classList.toggle("on", x === li));
+        hiLayer.clearLayers();
+        const l = oppLine(o, { color: css("--accent"), weight: 4.5, opacity: 1 }).addTo(hiLayer);
+        [[o.a_lat, o.a_lon, o.a_name], [o.b_lat, o.b_lon, o.b_name]].forEach(([y, x, n]) =>
+          L.circleMarker([y, x], { radius: 6, color: css("--accent"), fillColor: css("--surface"), fillOpacity: 1, weight: 2.5 })
+            .bindTooltip(esc(n), { permanent: true, direction: "top", offset: [0, -6] }).addTo(hiLayer));
+        map.flyToBounds(l.getBounds().pad(0.6), { duration: 0.6 });
+      };
+      li.addEventListener("click", show);
+      li.addEventListener("keydown", (e) => e.key === "Enter" && show());
+    });
+  }
+  $("#f-status").addEventListener("change", renderOpps);
+  $("#f-onnet").addEventListener("change", renderOpps);
+  renderOpps();
+
+  // Country table
+  let names;
+  try { names = new Intl.DisplayNames(["en"], { type: "region" }); } catch (e) { names = null; }
+  const regionName = (cc) => { try { return names ? names.of(cc) : cc; } catch (e) { return cc; } };
+  const maxDep = Math.max(...countries.map((c) => c.weekly_trip_departures));
+  const cols = [["country", "Country"], ["stops", "Stops", 1], ["places_served", "Cities", 1], ["cities_100k_served", "Cities ≥100k", 1],
+    ["weekly_trip_departures", "Weekly departures", 1], ["routes_starting", "Routes", 1], ["city_pairs", "City pairs", 1], ["cross_border_share", "Cross-border", 1]];
+  $("#tbl-countries").innerHTML = `<thead><tr>${cols.map(([, n, r]) => `<th class="${r ? "n" : ""}">${n}</th>`).join("")}</tr></thead><tbody>` +
+    countries.map((c) => `<tr class="${c.europe_east ? "ee" : ""}">${cols.map(([k, , r]) => {
+      if (k === "country") return `<td>${esc(regionName(c[k]))} <span class="cc">${esc(c[k])}</span></td>`;
+      if (k === "cross_border_share") return `<td class="n">${pct(c[k])}</td>`;
+      if (k === "weekly_trip_departures") return `<td class="n">${fmt(c[k])}<span class="bar" style="width:${(60 * c[k] / maxDep).toFixed(1)}px"></span></td>`;
+      return `<td class="${r ? "n" : ""}">${esc(fmt(c[k]) === "NaN" ? c[k] : (r ? fmt(c[k]) : c[k]))}</td>`;
+    }).join("")}</tr>`).join("") + "</tbody>";
+
+  // Quality
+  $("#q-sub").textContent = `${quality.checks} checks over ${fmt(quality.records_checked)} records; ${fmt(quality.records_flagged)} flagged.`;
+  const qp = $("#q-pill");
+  qp.textContent = quality.errors ? `${quality.errors} errors` : quality.warnings ? `${quality.warnings} warning${quality.warnings > 1 ? "s" : ""}, 0 errors` : "All checks passed";
+  qp.className = "pill " + (quality.errors ? "warn" : "ok");
+  $("#checks").innerHTML = quality.results.map((c) => {
+    const ic = c.passed ? ["ok", "✓"] : c.severity === "error" ? ["bad", "✕"] : ["warn", "!"];
+    return `<li><span class="ic ${ic[0]}">${ic[1]}</span><span>${esc(c.title)}</span><span class="ct">${fmt(c.failed)} / ${fmt(c.checked)}</span>
+      ${!c.passed && c.examples.length ? `<span class="ex">e.g. ${c.examples.slice(0, 3).map(esc).join("; ")}</span>` : ""}</li>`;
+  }).join("");
+
+  // Changelog
+  const S = changes.summary;
+  $("#c-sub").textContent = changes.baseline ? `Baseline snapshot ${changes.to}. The weekly run compares each new feed with the previous snapshot.` : `${changes.from} → ${changes.to}`;
+  $("#changelog").innerHTML = `<div class="chg">
+    <div><b>${S.places_added}/${S.places_removed}</b><span>cities added / removed</span></div>
+    <div><b>${S.pairs_added}/${S.pairs_removed}</b><span>direct pairs added / removed</span></div>
+    <div><b>${S.frequency_up}/${S.frequency_down}</b><span>frequency up / down (≥7/wk)</span></div></div>` +
+    (changes.events.length ? `<div class="table-wrap short"><table><tbody>${changes.events.filter((e) => e.ee !== false).slice(0, 40).map((e) =>
+      `<tr><td>${esc(e.type.replace("_", " "))}</td><td>${esc(e.item)}</td><td class="n">${e.from != null ? `${e.from} → ${e.to}` : e.weekly ?? ""}</td></tr>`).join("")}</tbody></table></div>` : "");
+  $("#tbl-top").innerHTML = `<thead><tr><th>City pair</th><th class="n">km</th><th class="n">Weekly</th><th class="n">Fastest</th></tr></thead><tbody>` +
+    top.slice(0, 15).map((t) => `<tr><td>${esc(t.a_name)} – ${esc(t.b_name)}</td><td class="n">${fmt(t.km)}</td><td class="n">${fmt(t.weekly_departures)}</td><td class="n">${Math.floor(t.fastest_min / 60)}h${String(t.fastest_min % 60).padStart(2, "0")}</td></tr>`).join("") + "</tbody>";
+
+  // Downloads
+  const dl = [
+    ["XLSX", "europe-east-network-report.xlsx", "Network report pack", "Summary, data quality, country KPIs, city pairs, opportunities, changelog"],
+  ];
+  if (meta.dossier) {
+    dl.push(["DOCX", meta.dossier.file, `Line dossier: ${meta.dossier.pair}`, "Draft authorization dossier: route, stops, map, timetable, legal basis, checklist"]);
+    dl.push(["PNG", meta.dossier.file.replace(".docx", "-map.png"), "Dossier overview map", "Schematic map of the proposed line"]);
+  }
+  $("#dl").innerHTML = dl.map(([x, f, t, d]) => `<a class="dl" href="data/${f}" download><span class="ext">${x}</span><span><b>${esc(t)}</b><span>${esc(d)}</span></span></a>`).join("");
+})();
