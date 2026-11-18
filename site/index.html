@@ -11,19 +11,21 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="top">
-  <div class="wrap top-in">
-    <div>
-      <div class="eyebrow">Network planning · Europe East</div>
-      <h1>Europe East Coach Network Planner</h1>
-      <p class="sub">Independent analysis of the public FlixBus GTFS timetable feed: data quality, connectivity, demand gaps and draft line-authorization dossiers. <span id="snap"></span></p>
-    </div>
-    <nav class="links">
+<nav class="menubar" aria-label="Sections">
+  <div class="wrap menubar-in">
+    <span class="brand"><i class="mark" aria-hidden="true"></i>Network Planner</span>
+    <div class="links">
       <a href="#map">Map</a><a href="#gaps">Opportunities</a><a href="#countries">Countries</a>
-      <a href="#quality">Data quality</a><a href="#changes">Changelog</a><a href="#downloads">Downloads</a><a href="#method">Method</a>
-      <a class="gh" href="https://github.com/Kiran-koppera/europe-east-network-planner">GitHub ↗</a>
-    </nav>
+      <a href="#quality">Data quality</a><a href="#changes">Changelog</a><a href="#downloads">Reports</a><a href="#method">Method</a>
+    </div>
+    <a class="gh" href="https://github.com/Kiran-koppera/europe-east-network-planner">GitHub ↗</a>
   </div>
+</nav>
+<header class="hero wrap">
+  <div class="eyebrow">Network planning · Europe East</div>
+  <h1>Europe East Coach Network Planner</h1>
+  <p class="sub">Independent analysis of the public FlixBus GTFS timetable feed: data quality, connectivity, demand gaps and draft line-authorization dossiers.</p>
+  <p class="snap" id="snap"></p>
 </header>
 
 <main class="wrap">
@@ -31,6 +33,7 @@
 
   <section class="grid-map" id="map">
     <div class="card map-card">
+      <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
       <div class="card-head">
         <div><h2>Network and opportunities</h2><p>Lines show weekly bus runs on each segment in the reference week. Dashed lines are the top unserved city pairs.</p></div>
         <div class="toggles">

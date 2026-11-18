@@ -11,7 +11,8 @@
   const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
   const ymd = (s) => (s && s.length === 8 ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6)}` : s);
 
-  $("#snap").textContent = `Snapshot ${F.snapshot_date} · feed valid ${ymd(F.feed_start_date)} to ${ymd(F.feed_end_date)} · reference week ${F.reference_week[0]} to ${F.reference_week[1]}.`;
+  $("#snap").innerHTML = [`Snapshot ${F.snapshot_date}`, `Feed ${ymd(F.feed_start_date)} → ${ymd(F.feed_end_date)}`,
+    `Reference week ${F.reference_week[0]} → ${F.reference_week[1]}`].map((t) => `<span>${esc(t)}</span>`).join("<span aria-hidden=\"true\">·</span>");
 
   // KPIs
   const E = M.europe_east, Q = M.quality, D = M.demand;
@@ -26,11 +27,10 @@
   $("#kpis").innerHTML = kpis.map(([l, v, n]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join("");
 
   // Map
-  const dark = matchMedia("(prefers-color-scheme: dark)").matches && document.documentElement.dataset.theme !== "light";
   const map = L.map("leaflet", { preferCanvas: true, zoomSnap: 0.5 }).setView([48.6, 22.5], 5);
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 12, className: dark ? "tiles dark" : "tiles",
+    maxZoom: 12, className: "tiles",
   }).addTo(map);
   const P = Object.fromEntries(net.places.map((p) => [p.id, p]));
   const netLayer = L.layerGroup(), oppLayer = L.layerGroup(), unsLayer = L.layerGroup(), hiLayer = L.layerGroup().addTo(map);
